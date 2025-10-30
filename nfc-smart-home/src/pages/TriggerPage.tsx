@@ -261,7 +261,7 @@ const TriggerPage: React.FC = () => {
       };
     }
 
-    const { data, error } = await supabase.functions.invoke(functionName, {
+    const { error } = await supabase.functions.invoke(functionName, {
       body: payload
     });
 
@@ -302,11 +302,6 @@ const TriggerPage: React.FC = () => {
       setScanning(false);
       setToast({ show: true, message: `Scan error: ${error.message}`, color: 'danger' });
     }
-  };
-
-  const getTagName = (tagId: string) => {
-    const tag = tags.find(t => t.id === tagId);
-    return tag?.name || 'Unknown Tag';
   };
 
   return (

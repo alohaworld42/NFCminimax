@@ -26,7 +26,6 @@ const Dashboard: React.FC = () => {
   const [tags, setTags] = useState<NFCTag[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
-  const [loading, setLoading] = useState(true);
 
   const loadDashboardData = async () => {
     try {
@@ -44,8 +43,6 @@ const Dashboard: React.FC = () => {
       if (activityRes.data) setRecentActivity(activityRes.data);
     } catch (error) {
       console.error('Error loading dashboard:', error);
-    } finally {
-      setLoading(false);
     }
   };
 

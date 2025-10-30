@@ -21,7 +21,6 @@ import { ActivityLog } from '../types';
 
 const ActivityPage: React.FC = () => {
   const [activities, setActivities] = useState<ActivityLog[]>([]);
-  const [loading, setLoading] = useState(true);
 
   const loadActivities = async () => {
     try {
@@ -39,8 +38,6 @@ const ActivityPage: React.FC = () => {
       if (data) setActivities(data);
     } catch (error) {
       console.error('Error loading activities:', error);
-    } finally {
-      setLoading(false);
     }
   };
 

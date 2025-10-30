@@ -11,7 +11,7 @@ import {
   setupIonicReact
 } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
-import { home, grid, cog, time, flash, link } from 'ionicons/icons';
+import { home, grid, cog, flash, link } from 'ionicons/icons';
 
 import Dashboard from './pages/Dashboard';
 import TagsPage from './pages/TagsPage';

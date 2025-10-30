@@ -239,7 +239,7 @@ const ActionsPage: React.FC = () => {
         };
       }
 
-      const { data, error } = await supabase.functions.invoke(functionName, {
+      const { error } = await supabase.functions.invoke(functionName, {
         body: payload
       });
 

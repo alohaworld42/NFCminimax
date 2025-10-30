@@ -22,7 +22,7 @@ import {
   IonFabButton,
   IonIcon,
 } from '@ionic/react';
-import { add, scan, trash } from 'ionicons/icons';
+import { scan, trash } from 'ionicons/icons';
 import { supabase } from '../services/supabase';
 import { nfcService } from '../services/nfc.service';
 import { NFCTag } from '../types';
@@ -36,7 +36,6 @@ const TagsPage: React.FC = () => {
   const [tagName, setTagName] = useState('');
   const [tagDescription, setTagDescription] = useState('');
   const [scannedTagId, setScannedTagId] = useState('');
-  const [scanning, setScanning] = useState(false);
   const [toast, setToast] = useState<{ show: boolean; message: string; color: string }>({
     show: false,
     message: '',
@@ -80,13 +79,11 @@ const TagsPage: React.FC = () => {
 
   const startScanForNewTag = async () => {
     setShowScanModal(true);
-    setScanning(true);
 
     try {
       const enabled = await nfcService.isEnabled();
       if (!enabled) {
         setToast({ show: true, message: 'Please enable NFC in settings', color: 'warning' });
-        setScanning(false);
         return;
       }
 
@@ -95,7 +92,6 @@ const TagsPage: React.FC = () => {
       nfcService.onTagScanned((event) => {
         const tagId = nfcService.extractTagId(event);
         setScannedTagId(tagId);
-        setScanning(false);
         nfcService.stopScan();
         setShowModal(true);
         setShowScanModal(false);
@@ -103,7 +99,6 @@ const TagsPage: React.FC = () => {
 
     } catch (error: any) {
       setToast({ show: true, message: `Scan error: ${error.message}`, color: 'danger' });
-      setScanning(false);
     }
   };
 
@@ -215,7 +210,6 @@ const TagsPage: React.FC = () => {
 
         <IonModal isOpen={showScanModal} onDidDismiss={() => {
           setShowScanModal(false);
-          setScanning(false);
           nfcService.stopScan();
         }}>
           <IonHeader>
@@ -232,7 +226,6 @@ const TagsPage: React.FC = () => {
               <IonButton onClick={() => {
                 setShowScanModal(false);
                 nfcService.stopScan();
-                setScanning(false);
               }}>
                 Cancel
               </IonButton>

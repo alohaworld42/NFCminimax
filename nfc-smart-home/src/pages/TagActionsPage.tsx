@@ -257,11 +257,6 @@ const TagActionsPage: React.FC = () => {
     return tag?.name || 'Unknown Tag';
   };
 
-  const getActionName = (actionId: string) => {
-    const action = actions.find(a => a.id === actionId);
-    return action?.name || 'Unknown Action';
-  };
-
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (

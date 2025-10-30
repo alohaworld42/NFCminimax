@@ -1,8 +1,21 @@
-import { Nfc, NfcTagScannedEvent } from '@capawesome-team/capacitor-nfc';
+import { CapacitorNfc } from '@capgo/capacitor-nfc';
+
+export interface NfcTagEvent {
+  tag?: {
+    id?: number[];
+    techTypes?: string[];
+    type?: string | null;
+    maxSize?: number | null;
+    isWritable?: boolean | null;
+    canMakeReadOnly?: boolean | null;
+    ndefMessage?: any[] | null;
+  };
+}
 
 export class NFCService {
   private static instance: NFCService;
   private scanning: boolean = false;
+  private listenerHandles: any[] = [];
 
   private constructor() {}
 
@@ -15,8 +28,8 @@ export class NFCService {
 
   async isSupported(): Promise<boolean> {
     try {
-      const { isSupported } = await Nfc.isSupported();
-      return isSupported;
+      const { status } = await CapacitorNfc.getStatus();
+      return status !== 'NO_NFC';
     } catch (error) {
       console.error('Error checking NFC support:', error);
       return false;
@@ -25,8 +38,8 @@ export class NFCService {
 
   async isEnabled(): Promise<boolean> {
     try {
-      const { isEnabled } = await Nfc.isEnabled();
-      return isEnabled;
+      const { status } = await CapacitorNfc.getStatus();
+      return status === 'NFC_OK';
     } catch (error) {
       console.error('Error checking NFC enabled:', error);
       return false;
@@ -37,7 +50,10 @@ export class NFCService {
     if (this.scanning) return;
 
     try {
-      await Nfc.startScanSession();
+      await CapacitorNfc.startScanning({
+        invalidateAfterFirstRead: false,
+        alertMessage: 'Hold a tag near the top of your device.',
+      });
       this.scanning = true;
     } catch (error) {
       console.error('Error starting NFC scan:', error);
@@ -49,28 +65,37 @@ export class NFCService {
     if (!this.scanning) return;
 
     try {
-      await Nfc.stopScanSession();
+      await CapacitorNfc.stopScanning();
       this.scanning = false;
     } catch (error) {
       console.error('Error stopping NFC scan:', error);
     }
   }
 
-  onTagScanned(callback: (event: NfcTagScannedEvent) => void) {
-    Nfc.addListener('nfcTagScanned', callback);
+  async onTagScanned(callback: (event: NfcTagEvent) => void): Promise<any> {
+    const handle = await CapacitorNfc.addListener('nfcEvent', callback);
+    this.listenerHandles.push(handle);
+    return handle;
   }
 
   removeAllListeners() {
-    Nfc.removeAllListeners();
+    // Remove all listener handles
+    this.listenerHandles.forEach(handle => {
+      if (handle?.remove) {
+        handle.remove();
+      }
+    });
+    this.listenerHandles = [];
   }
 
-  isScan ning() {
+  isScanning() {
     return this.scanning;
   }
 
-  extractTagId(event: NfcTagScannedEvent): string {
+  extractTagId(event: NfcTagEvent): string {
     // Extract unique tag ID from NFC event
-    return event.nfcTag.id || '';
+    const tagId = event.tag?.id || [];
+    return tagId.map(b => b.toString(16).padStart(2, '0')).join('');
   }
 }
 
