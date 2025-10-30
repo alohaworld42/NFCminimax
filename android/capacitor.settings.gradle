@@ -1,2 +1,0 @@
-include ':capacitor-android'
-project(':capacitor-android').projectDir = new('../node_modules/@capacitor/android')
