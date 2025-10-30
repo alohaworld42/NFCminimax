@@ -1,0 +1,51 @@
+{
+  "name": "nfc-smart-home",
+  "version": "1.0.0",
+  "description": "NFC Smart Home Automation App",
+  "author": "MiniMax Agent",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "lint": "eslint src --ext ts,tsx",
+    "ios": "ionic capacitor run ios -l --external",
+    "android": "ionic capacitor run android -l --external",
+    "sync": "ionic capacitor sync"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/haptics": "^7.0.0",
+    "@capacitor/ios": "^7.0.0",
+    "@capacitor/keyboard": "^7.0.0",
+    "@capacitor/status-bar": "^7.0.0",
+    "@capgo/capacitor-nfc": "^7.0.5",
+    "@ionic/react": "^8.0.0",
+    "@ionic/react-router": "^8.0.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "ionicons": "^7.2.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router": "^5.3.4",
+    "react-router-dom": "^5.3.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0",
+    "@ionic/cli": "^7.2.0",
+    "@types/react": "^18.2.47",
+    "@types/react-dom": "^18.2.18",
+    "@types/react-router": "^5.1.20",
+    "@types/react-router-dom": "^5.3.3",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "eslint": "^8.56.0",
+    "eslint-plugin-react": "^7.33.2",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.11",
+    "vitest": "^1.2.0"
+  }
+}
