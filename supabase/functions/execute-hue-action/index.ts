@@ -2,8 +2,9 @@ Deno.serve(async (req) => {
     const corsHeaders = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-        'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+        'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
         'Access-Control-Max-Age': '86400',
+        'Access-Control-Allow-Credentials': 'false'
     };
 
     if (req.method === 'OPTIONS') {
@@ -12,96 +13,108 @@ Deno.serve(async (req) => {
 
     try {
         const { bridgeIp, username, actionType, actionParams, deviceId } = await req.json();
-
+        
         if (!bridgeIp || !username || !actionType) {
-            throw new Error('Missing required parameters: bridgeIp, username, actionType');
+            throw new Error('Bridge IP, username, and action type are required');
         }
 
+        const apiUrl = `http://${bridgeIp}/api/${username}`;
         let endpoint = '';
-        let method = 'PUT';
-        let body: any = {};
+        let body = {};
 
-        // Build the API endpoint and body based on action type
+        // Build Hue API call based on action type
         switch (actionType) {
             case 'light_on':
-                endpoint = `/api/${username}/lights/${deviceId}/state`;
-                body = { on: true, ...actionParams };
+                endpoint = `/lights/${deviceId || '1'}/state`;
+                body = { on: true };
+                if (actionParams.brightness) {
+                    body.bri = actionParams.brightness;
+                }
                 break;
             case 'light_off':
-                endpoint = `/api/${username}/lights/${deviceId}/state`;
+                endpoint = `/lights/${deviceId || '1'}/state`;
                 body = { on: false };
                 break;
             case 'set_brightness':
-                endpoint = `/api/${username}/lights/${deviceId}/state`;
-                body = { bri: actionParams.brightness || 254 };
+                endpoint = `/lights/${deviceId || '1'}/state`;
+                body = { 
+                    on: true,
+                    bri: actionParams.brightness || 254
+                };
                 break;
             case 'set_color':
-                endpoint = `/api/${username}/lights/${deviceId}/state`;
-                body = { 
-                    hue: actionParams.hue || 0, 
+                endpoint = `/lights/${deviceId || '1'}/state`;
+                body = {
+                    on: true,
+                    hue: actionParams.hue || 0,
                     sat: actionParams.saturation || 254,
                     bri: actionParams.brightness || 254
                 };
                 break;
             case 'set_color_temp':
-                endpoint = `/api/${username}/lights/${deviceId}/state`;
-                body = { ct: actionParams.colorTemp || 200 };
+                endpoint = `/lights/${deviceId || '1'}/state`;
+                body = {
+                    on: true,
+                    ct: actionParams.colorTemp || 200
+                };
                 break;
             case 'activate_scene':
-                endpoint = `/api/${username}/groups/${actionParams.groupId || 0}/action`;
-                body = { scene: actionParams.sceneId };
+                endpoint = `/groups/${actionParams.groupId || '0'}/action`;
+                body = {
+                    scene: actionParams.sceneId
+                };
                 break;
             case 'group_on':
-                endpoint = `/api/${username}/groups/${deviceId}/action`;
-                body = { on: true, ...actionParams };
+                endpoint = `/groups/${actionParams.groupId || '0'}/action`;
+                body = {
+                    on: true,
+                    bri: actionParams.brightness || 254
+                };
                 break;
             case 'group_off':
-                endpoint = `/api/${username}/groups/${deviceId}/action`;
+                endpoint = `/groups/${actionParams.groupId || '0'}/action`;
                 body = { on: false };
                 break;
             default:
-                throw new Error(`Unknown action type: ${actionType}`);
+                throw new Error(`Unsupported action type: ${actionType}`);
         }
 
-        // Execute the Hue API call
-        const hueUrl = `http://${bridgeIp}${endpoint}`;
-        console.log(`Calling Hue API: ${hueUrl}`);
-
-        const response = await fetch(hueUrl, {
-            method,
+        const response = await fetch(`${apiUrl}${endpoint}`, {
+            method: 'PUT',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
             },
             body: JSON.stringify(body)
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Hue API error: ${response.status} - ${errorText}`);
+            throw new Error(`Hue API call failed: ${response.status}`);
         }
 
         const result = await response.json();
-        
-        // Check for Hue API errors in response
-        if (Array.isArray(result) && result[0]?.error) {
-            throw new Error(`Hue API error: ${JSON.stringify(result[0].error)}`);
-        }
 
         return new Response(JSON.stringify({
             success: true,
-            data: result
+            data: {
+                action: actionType,
+                result: result,
+                endpoint: endpoint,
+                body: body
+            }
         }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
 
     } catch (error) {
-        console.error('Hue action error:', error);
-        return new Response(JSON.stringify({
+        const errorResponse = {
+            success: false,
             error: {
                 code: 'HUE_ACTION_FAILED',
                 message: error.message
             }
-        }), {
+        };
+
+        return new Response(JSON.stringify(errorResponse), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-A production-ready NFC-triggered smart home automation application built with Ionic/Capacitor and Supabase. Users can scan NFC tags with their smartphones to automatically control Philips Hue lights and Meross smart plugs.
+A production-ready NFC-triggered smart home automation application built with Ionic/Capacitor and Supabase. Users can scan NFC tags with their smartphones to automatically control smart home devices (Philips Hue, Meross, SmartThings, LSC Smart Connect) and launch mobile apps on Samsung phones.
 
 ## Technical Architecture
 
@@ -16,23 +16,26 @@ A production-ready NFC-triggered smart home automation application built with Io
 ### Backend Stack (Supabase)
 - **Database**: PostgreSQL with 8 tables and full RLS policies
 - **Authentication**: Supabase Auth (JWT-based, email/password)
-- **Edge Functions**: 5 Deno-based serverless functions
+- **Edge Functions**: 13 Deno-based serverless functions
 - **API**: RESTful via PostgREST
 
 ### Smart Home Integrations
 - **Philips Hue**: Local Bridge API (HTTP, mDNS discovery)
 - **Meross**: Cloud MQTT API with HTTP authentication
+- **SmartThings**: REST API v1 with Personal Access Token authentication (Added 2025-10-31)
+- **LSC Smart Connect**: Tuya Cloud REST API with HMAC-SHA256 signing (Added 2025-10-31)
+- **Samsung App Control**: Native Capacitor plugin for Android app launching (Added 2025-10-31)
 
 ## Database Schema
 
 ### Tables Created
 1. **profiles**: User profiles extending auth.users
 2. **nfc_tags**: NFC tag metadata (tag_id, name, description, status)
-3. **devices**: Smart home devices (type, connection details, online status)
+3. **devices**: Smart home devices (type: hue_bridge | meross_plug | smartthings_device | lsc_device | samsung_app_control, connection details, online status)
 4. **actions**: Device actions (device_id, action_type, parameters)
 5. **tag_actions**: Many-to-many linking between tags and actions
 6. **activity_log**: Automation execution history (status, timestamps, errors)
-7. **api_credentials**: Encrypted API key storage
+7. **api_credentials**: Encrypted API key storage (service_type: hue | meross | smartthings | lsc | samsung_app)
 
 All tables have:
 - UUID primary keys
@@ -69,10 +72,67 @@ All tables have:
 - **Actions Supported**: turn_on, turn_off
 - **Note**: Uses HTTP authentication with MD5 signatures
 
-### 5. test-device-connection
+### 5. test-device-connection (v5)
 - **Purpose**: Verify device connectivity
-- **Supports**: Both Hue bridges and Meross plugs
+- **Supports**: Hue bridges, Meross plugs, SmartThings devices, LSC devices, and Samsung app control
 - **Returns**: Online status and device details
+
+### 6. authenticate-smartthings (Added 2025-10-31)
+- **Purpose**: Validate SmartThings Personal Access Token
+- **Input**: Personal Access Token
+- **Returns**: Validation status and device count
+
+### 7. discover-smartthings-devices (Added 2025-10-31)
+- **Purpose**: List all SmartThings devices
+- **Input**: Personal Access Token
+- **Returns**: Array of devices with capabilities
+
+### 8. execute-smartthings-action (Added 2025-10-31)
+- **Purpose**: Execute commands on SmartThings devices
+- **Input**: PAT, device ID, action type, parameters
+- **Actions Supported**: switch_on, switch_off, set_level, set_color, set_color_temperature, lock, unlock
+- **Returns**: Command execution status
+
+### 9. authenticate-lsc (Added 2025-10-31)
+- **Purpose**: Validate Tuya/LSC credentials and get access token
+- **Input**: Client ID, Client Secret, Data Center
+- **Returns**: Access token and validation status
+
+### 10. discover-lsc-devices (Added 2025-10-31)
+- **Purpose**: List all Tuya/LSC devices
+- **Input**: Client ID, Secret, Access Token, Data Center
+- **Returns**: Array of devices with categories
+
+### 11. execute-lsc-action (Added 2025-10-31)
+- **Purpose**: Execute commands on Tuya/LSC devices
+- **Input**: Credentials, device ID, action type, parameters
+- **Actions Supported**: switch_on, switch_off, set_brightness, set_color_temp, set_color, set_white_mode, socket_on, socket_off
+- **Returns**: Command execution status
+
+### 12. execute-samsung-app-action (Added 2025-10-31)
+- **Purpose**: Validate and coordinate Samsung app control actions
+- **Input**: Device ID, action type (launch_app, close_app, switch_app, bring_to_foreground), package name
+- **Returns**: Validation status and execution instructions
+
+### 13. get-samsung-apps-list (Added 2025-10-31)
+- **Purpose**: Provide list of popular Android/Samsung apps
+- **Returns**: 41 apps with package names, organized by category (Samsung, Google, Social, Entertainment, Productivity)
+
+## Native Capacitor Plugins
+
+### SamsungAppControlPlugin (Added 2025-10-31)
+- **Platform**: Android (Java)
+- **Location**: `/android/app/src/main/java/com/nfcsmarthome/appcontrol/SamsungAppControlPlugin.java`
+- **Purpose**: Native Android plugin for launching and controlling apps
+- **Methods**:
+  - `launchApp(packageName)`: Launch an app by package name
+  - `closeApp(packageName)`: Close an app (limited by Android security)
+  - `switchToApp(packageName)`: Switch to app or launch if not running
+  - `isAppInstalled(packageName)`: Check if app is installed
+  - `getInstalledApps()`: Get count of launchable apps
+  - `bringToForeground(packageName)`: Bring app to foreground
+- **Technology**: Android PackageManager and Intent APIs
+- **Supported Devices**: All Android devices (Samsung Galaxy optimized)
 
 ## Frontend Pages Implemented
 
@@ -94,9 +154,12 @@ All tables have:
 - Modal forms for tag configuration
 
 ### 4. DevicesPage
-- Device management for Hue and Meross
+- Device management for Hue, Meross, SmartThings, LSC, and Samsung app control
 - Hue Bridge auto-discovery
 - Link button authentication flow
+- SmartThings PAT validation and device discovery
+- LSC Tuya credentials authentication and device discovery
+- Samsung app selection from 41 popular apps or custom package name
 - Connection testing
 - Online/offline status badges
 
@@ -306,6 +369,12 @@ Configure in Android Studio:
 - https://jrchntonfshqvorcfvqh.supabase.co/functions/v1/execute-hue-action
 - https://jrchntonfshqvorcfvqh.supabase.co/functions/v1/execute-meross-action
 - https://jrchntonfshqvorcfvqh.supabase.co/functions/v1/test-device-connection
+- https://jrchntonfshqvorcfvqh.supabase.co/functions/v1/authenticate-smartthings
+- https://jrchntonfshqvorcfvqh.supabase.co/functions/v1/discover-smartthings-devices
+- https://jrchntonfshqvorcfvqh.supabase.co/functions/v1/execute-smartthings-action
+- https://jrchntonfshqvorcfvqh.supabase.co/functions/v1/authenticate-lsc
+- https://jrchntonfshqvorcfvqh.supabase.co/functions/v1/discover-lsc-devices
+- https://jrchntonfshqvorcfvqh.supabase.co/functions/v1/execute-lsc-action
 
 ## Development Workflow
 
@@ -355,10 +424,16 @@ Configure in Android Studio:
 - **Capawesome NFC Plugin**: https://capawesome.io/plugins/nfc/
 - **Supabase**: https://supabase.com/docs
 - **Philips Hue API**: https://developers.meethue.com
+- **SmartThings API**: https://developer.smartthings.com/docs/api/public
+- **Tuya/LSC API**: https://developer.tuya.com
 - **Research Files**:
   - ionic_nfc_research.md
   - philips_hue_api_research.md
   - meross_api_research.md
+  - smartthings_api_research.md (Added 2025-10-31)
+  - smartthings_integration_guide.md (Added 2025-10-31)
+  - tuya_lsc_api_research.md (Added 2025-10-31)
+  - lsc_integration_summary.md (Added 2025-10-31)
   - ionic_architecture_patterns.md
 
 ## License

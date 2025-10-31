@@ -12,7 +12,7 @@ export interface NFCTag {
 export interface Device {
   id: string;
   user_id: string;
-  device_type: 'hue_bridge' | 'meross_plug';
+  device_type: 'hue_bridge' | 'meross_plug' | 'smartthings_device' | 'lsc_device' | 'samsung_app_control';
   name: string;
   connection_details: any;
   is_online: boolean;
@@ -57,7 +57,7 @@ export interface ActivityLog {
 export interface APICredentials {
   id: string;
   user_id: string;
-  service_type: 'hue' | 'meross';
+  service_type: 'hue' | 'meross' | 'smartthings' | 'lsc' | 'samsung_app';
   credentials: any;
   is_valid: boolean;
   created_at: string;

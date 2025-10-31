@@ -2,8 +2,9 @@ Deno.serve(async (req) => {
     const corsHeaders = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-        'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+        'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
         'Access-Control-Max-Age': '86400',
+        'Access-Control-Allow-Credentials': 'false'
     };
 
     if (req.method === 'OPTIONS') {
@@ -11,58 +12,32 @@ Deno.serve(async (req) => {
     }
 
     try {
-        // Use the Philips discovery broker service
-        const discoveryUrl = 'https://discovery.meethue.com/';
+        // Philips Hue Bridge Discovery via Meethue.com
+        const response = await fetch('https://discovery.meethue.com/');
         
-        console.log('Discovering Hue bridges via broker...');
-        
-        const response = await fetch(discoveryUrl, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json'
-            }
-        });
-
         if (!response.ok) {
             throw new Error(`Discovery failed: ${response.status}`);
         }
 
         const bridges = await response.json();
         
-        if (!Array.isArray(bridges) || bridges.length === 0) {
-            return new Response(JSON.stringify({
-                success: true,
-                data: {
-                    bridges: [],
-                    message: 'No Hue bridges found on the network'
-                }
-            }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            });
-        }
-
-        // Return discovered bridges with their IP addresses
-        return new Response(JSON.stringify({
-            success: true,
-            data: {
-                bridges: bridges.map(bridge => ({
-                    id: bridge.id,
-                    internalipaddress: bridge.internalipaddress,
-                    port: bridge.port || 80
-                }))
-            }
+        return new Response(JSON.stringify({ 
+            success: true, 
+            data: { bridges: bridges || [] }
         }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
 
     } catch (error) {
-        console.error('Bridge discovery error:', error);
-        return new Response(JSON.stringify({
+        const errorResponse = {
+            success: false,
             error: {
                 code: 'DISCOVERY_FAILED',
                 message: error.message
             }
-        }), {
+        };
+
+        return new Response(JSON.stringify(errorResponse), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });

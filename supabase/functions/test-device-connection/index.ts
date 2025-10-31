@@ -2,8 +2,9 @@ Deno.serve(async (req) => {
     const corsHeaders = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
         'Access-Control-Max-Age': '86400',
+        'Access-Control-Allow-Credentials': 'false'
     };
 
     if (req.method === 'OPTIONS') {
@@ -12,98 +13,112 @@ Deno.serve(async (req) => {
 
     try {
         const { deviceType, connectionDetails } = await req.json();
-
-        if (!deviceType || !connectionDetails) {
-            throw new Error('Missing required parameters: deviceType, connectionDetails');
+        
+        if (!deviceType) {
+            throw new Error('Device type is required');
         }
 
-        let testResult: any = {
-            success: false,
-            online: false,
-            details: {}
-        };
+        let online = false;
+        let deviceInfo = {};
 
         if (deviceType === 'hue_bridge') {
-            // Test Hue Bridge connection
             const { bridgeIp, username } = connectionDetails;
             
-            if (!bridgeIp || !username) {
-                throw new Error('Missing Hue bridge IP or username');
+            if (!bridgeIp) {
+                throw new Error('Bridge IP is required for Hue device');
             }
 
             try {
-                const response = await fetch(`http://${bridgeIp}/api/${username}/config`, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                });
-
+                // Test Hue bridge connection by getting lights
+                const response = await fetch(`http://${bridgeIp}/api/${username || ''}/lights`);
+                
                 if (response.ok) {
-                    const config = await response.json();
-                    
-                    // Check if response contains error
-                    if (Array.isArray(config) && config[0]?.error) {
-                        throw new Error(config[0].error.description);
-                    }
-
-                    testResult = {
-                        success: true,
-                        online: true,
-                        details: {
-                            name: config.name,
-                            bridgeid: config.bridgeid,
-                            modelid: config.modelid,
-                            apiversion: config.apiversion,
-                            swversion: config.swversion
-                        }
+                    const lights = await response.json();
+                    online = true;
+                    deviceInfo = {
+                        bridgeIp,
+                        lights: Object.keys(lights).length,
+                        connected: true
                     };
-                } else {
-                    throw new Error(`HTTP ${response.status}`);
+                } else if (response.status === 401) {
+                    // Bridge is online but needs authentication
+                    deviceInfo = {
+                        bridgeIp,
+                        connected: true,
+                        needsAuth: true,
+                        message: 'Bridge found but needs authentication'
+                    };
                 }
             } catch (error) {
-                testResult = {
-                    success: false,
-                    online: false,
+                deviceInfo = {
+                    bridgeIp,
+                    connected: false,
                     error: error.message
                 };
             }
 
         } else if (deviceType === 'meross_plug') {
-            // Test Meross connection (simplified - actual test would require MQTT)
-            const { email, password } = connectionDetails;
+            const { email, deviceUuid } = connectionDetails;
             
-            if (!email || !password) {
-                throw new Error('Missing Meross credentials');
+            if (!email) {
+                throw new Error('Email is required for Meross device');
             }
 
-            testResult = {
-                success: true,
-                online: true,
-                details: {
-                    message: 'Meross credentials stored. Device status requires MQTT connection.',
-                    note: 'Full device testing requires active MQTT session.'
+            try {
+                // Test Meross connectivity (simplified check)
+                const response = await fetch('https://m-api.meross.com/v1/Auth/Login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        password: 'test_password',
+                        sign: 'test_sign'
+                    })
+                });
+
+                // Even with wrong credentials, if we get a response, API is reachable
+                if (response.ok || response.status === 400) {
+                    online = true;
+                    deviceInfo = {
+                        email: email,
+                        connected: true,
+                        message: 'API reachable'
+                    };
                 }
-            };
+            } catch (error) {
+                deviceInfo = {
+                    email: email,
+                    connected: false,
+                    error: error.message
+                };
+            }
         } else {
-            throw new Error(`Unknown device type: ${deviceType}`);
+            throw new Error(`Unsupported device type: ${deviceType}`);
         }
 
         return new Response(JSON.stringify({
             success: true,
-            data: testResult
+            data: {
+                online: online,
+                deviceInfo: deviceInfo,
+                lastChecked: new Date().toISOString()
+            }
         }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
 
     } catch (error) {
-        console.error('Device test error:', error);
-        return new Response(JSON.stringify({
+        const errorResponse = {
+            success: false,
             error: {
-                code: 'TEST_FAILED',
+                code: 'CONNECTION_TEST_FAILED',
                 message: error.message
             }
-        }), {
+        };
+
+        return new Response(JSON.stringify(errorResponse), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });

@@ -2,8 +2,9 @@ Deno.serve(async (req) => {
     const corsHeaders = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH',
         'Access-Control-Max-Age': '86400',
+        'Access-Control-Allow-Credentials': 'false'
     };
 
     if (req.method === 'OPTIONS') {
@@ -12,79 +13,64 @@ Deno.serve(async (req) => {
 
     try {
         const { bridgeIp, devicetype } = await req.json();
-
+        
         if (!bridgeIp) {
-            throw new Error('Bridge IP address is required');
+            throw new Error('Bridge IP is required');
         }
 
-        const deviceName = devicetype || 'nfc-smart-home-app#capacitor';
-
-        // Create user on the bridge (link button must be pressed first)
-        const url = `http://${bridgeIp}/api`;
-        
-        console.log(`Creating user on bridge: ${bridgeIp}`);
-
-        const response = await fetch(url, {
+        // Philips Hue Bridge User Creation API
+        const response = await fetch(`http://${bridgeIp}/api`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                devicetype: deviceName
+                devicetype: devicetype || 'nfc-smart-home-app'
             })
         });
 
-        if (!response.ok) {
-            throw new Error(`Bridge authentication failed: ${response.status}`);
-        }
-
         const result = await response.json();
-        
-        // Check for errors in response
-        if (Array.isArray(result) && result[0]?.error) {
-            const error = result[0].error;
+
+        // Check for specific Hue API error codes
+        if (result && Array.isArray(result)) {
+            const successResponse = result.find(r => r.success);
+            const errorResponse = result.find(r => r.error);
             
-            if (error.type === 101) {
+            if (errorResponse) {
                 return new Response(JSON.stringify({
+                    success: false,
                     error: {
-                        code: 'LINK_BUTTON_NOT_PRESSED',
-                        message: 'Please press the link button on the Hue Bridge and try again'
+                        code: errorResponse.error.type,
+                        message: errorResponse.error.description || 'Link button not pressed'
                     }
                 }), {
                     status: 400,
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                 });
             }
-            
-            throw new Error(`Bridge error: ${error.description}`);
+
+            if (successResponse) {
+                return new Response(JSON.stringify({
+                    success: true,
+                    data: { username: successResponse.success.username }
+                }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
         }
 
-        // Success - extract username
-        if (Array.isArray(result) && result[0]?.success?.username) {
-            const username = result[0].success.username;
-            
-            return new Response(JSON.stringify({
-                success: true,
-                data: {
-                    username,
-                    bridgeIp,
-                    message: 'Successfully authenticated with Hue Bridge'
-                }
-            }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            });
-        }
-
-        throw new Error('Unexpected response format from bridge');
+        throw new Error('Unexpected response format');
 
     } catch (error) {
-        console.error('Hue user creation error:', error);
-        return new Response(JSON.stringify({
+        const errorResponse = {
+            success: false,
             error: {
-                code: 'USER_CREATION_FAILED',
+                code: 'AUTHENTICATION_FAILED',
                 message: error.message
             }
-        }), {
+        };
+
+        return new Response(JSON.stringify(errorResponse), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
