@@ -48,6 +48,15 @@ const ActionsPage: React.FC = () => {
   const [sceneId, setSceneId] = useState('');
   const [groupId, setGroupId] = useState('0');
   
+  // New device type states
+  const [level, setLevel] = useState(100);
+  const [red, setRed] = useState(255);
+  const [green, setGreen] = useState(255);
+  const [blue, setBlue] = useState(255);
+  const [rgbColor, setRgbColor] = useState('#ffffff');
+  const [colorHex, setColorHex] = useState('#ffffff');
+  const [appPackageName, setAppPackageName] = useState('');
+  
   const [toast, setToast] = useState<{ show: boolean; message: string; color: string }>({
     show: false,
     message: '',
@@ -111,6 +120,30 @@ const ActionsPage: React.FC = () => {
         { value: 'turn_on', label: 'Turn On' },
         { value: 'turn_off', label: 'Turn Off' },
       ];
+    } else if (deviceType === 'smartthings_device') {
+      return [
+        { value: 'switch_on', label: 'Turn On' },
+        { value: 'switch_off', label: 'Turn Off' },
+        { value: 'set_level', label: 'Set Level (Brightness)' },
+        { value: 'set_color', label: 'Set Color' },
+        { value: 'set_color_temperature', label: 'Set Color Temperature' },
+        { value: 'lock', label: 'Lock' },
+        { value: 'unlock', label: 'Unlock' },
+      ];
+    } else if (deviceType === 'lsc_device') {
+      return [
+        { value: 'turn_on', label: 'Turn On' },
+        { value: 'turn_off', label: 'Turn Off' },
+        { value: 'set_brightness', label: 'Set Brightness' },
+        { value: 'set_rgb_color', label: 'Set RGB Color' },
+        { value: 'set_color_temp', label: 'Set Color Temperature' },
+      ];
+    } else if (deviceType === 'samsung_app_control') {
+      return [
+        { value: 'launch_app', label: 'Launch App' },
+        { value: 'close_app', label: 'Close App' },
+        { value: 'switch_to_app', label: 'Switch to App' },
+      ];
     }
     return [];
   };
@@ -131,6 +164,25 @@ const ActionsPage: React.FC = () => {
       params.groupId = groupId;
     } else if (actionType === 'light_on' || actionType === 'group_on') {
       params.brightness = brightness;
+    }
+    
+    // SmartThings parameters
+    else if (actionType === 'set_level') {
+      params.level = level;
+    } else if (actionType === 'set_color') {
+      params.color = colorHex;
+    } else if (actionType === 'set_color_temperature') {
+      params.colorTemperature = colorTemp;
+    }
+    
+    // LSC parameters
+    else if (actionType === 'set_rgb_color') {
+      params.rgb = rgbColor;
+    }
+    
+    // Samsung app control parameters
+    else if (actionType === 'launch_app' || actionType === 'close_app' || actionType === 'switch_to_app') {
+      params.packageName = appPackageName;
     }
     
     return params;
@@ -237,6 +289,32 @@ const ActionsPage: React.FC = () => {
           actionParams: action.action_params,
           region: device.connection_details.region || 'us'
         };
+      } else if (device.device_type === 'smartthings_device') {
+        functionName = 'execute-smartthings-action';
+        payload = {
+          personalAccessToken: device.connection_details.personalAccessToken,
+          deviceId: device.connection_details.deviceId,
+          actionType: action.action_type,
+          actionParams: action.action_params
+        };
+      } else if (device.device_type === 'lsc_device') {
+        functionName = 'execute-lsc-action';
+        payload = {
+          clientId: device.connection_details.clientId,
+          clientSecret: device.connection_details.clientSecret,
+          accessToken: device.connection_details.accessToken,
+          dataCenter: device.connection_details.dataCenter,
+          deviceId: device.connection_details.deviceId,
+          actionType: action.action_type,
+          actionParams: action.action_params
+        };
+      } else if (device.device_type === 'samsung_app_control') {
+        functionName = 'execute-samsung-app-action';
+        payload = {
+          packageName: action.action_params.packageName,
+          actionType: action.action_type,
+          actionParams: action.action_params
+        };
       }
 
       const { error } = await supabase.functions.invoke(functionName, {
@@ -283,6 +361,12 @@ const ActionsPage: React.FC = () => {
     if (action.action_params.sceneId !== undefined) setSceneId(action.action_params.sceneId);
     if (action.action_params.groupId !== undefined) setGroupId(action.action_params.groupId);
     
+    // Load new parameter types
+    if (action.action_params.level !== undefined) setLevel(action.action_params.level);
+    if (action.action_params.color !== undefined) setColorHex(action.action_params.color);
+    if (action.action_params.rgb !== undefined) setRgbColor(action.action_params.rgb);
+    if (action.action_params.packageName !== undefined) setAppPackageName(action.action_params.packageName);
+    
     setShowModal(true);
   };
 
@@ -298,6 +382,15 @@ const ActionsPage: React.FC = () => {
     setColorTemp(200);
     setSceneId('');
     setGroupId('0');
+    
+    // Reset new device type states
+    setLevel(100);
+    setRed(255);
+    setGreen(255);
+    setBlue(255);
+    setRgbColor('#ffffff');
+    setColorHex('#ffffff');
+    setAppPackageName('');
   };
 
   const getDeviceName = (deviceId: string) => {
@@ -457,6 +550,19 @@ const ActionsPage: React.FC = () => {
               </IonItem>
             )}
 
+            {/* SmartThings Level parameter */}
+            {actionType === 'set_level' && (
+              <IonItem>
+                <IonLabel>Level: {level}%</IonLabel>
+                <IonRange
+                  min={0}
+                  max={100}
+                  value={level}
+                  onIonChange={e => setLevel(e.detail.value as number)}
+                />
+              </IonItem>
+            )}
+
             {actionType === 'set_color' && (
               <>
                 <IonItem>
@@ -480,6 +586,18 @@ const ActionsPage: React.FC = () => {
               </>
             )}
 
+            {/* SmartThings Color parameter */}
+            {actionType === 'set_color' && selectedDeviceObj?.device_type === 'smartthings_device' && (
+              <IonItem>
+                <IonLabel position="stacked">Color (Hex)</IonLabel>
+                <IonInput
+                  type="color"
+                  value={colorHex}
+                  onIonChange={e => setColorHex(e.detail.value!)}
+                />
+              </IonItem>
+            )}
+
             {actionType === 'set_color_temp' && (
               <IonItem>
                 <IonLabel>Color Temp (mireds): {colorTemp}</IonLabel>
@@ -488,6 +606,18 @@ const ActionsPage: React.FC = () => {
                   max={500}
                   value={colorTemp}
                   onIonChange={e => setColorTemp(e.detail.value as number)}
+                />
+              </IonItem>
+            )}
+
+            {/* LSC RGB Color parameter */}
+            {actionType === 'set_rgb_color' && (
+              <IonItem>
+                <IonLabel position="stacked">RGB Color</IonLabel>
+                <IonInput
+                  type="color"
+                  value={rgbColor}
+                  onIonChange={e => setRgbColor(e.detail.value!)}
                 />
               </IonItem>
             )}
@@ -511,6 +641,18 @@ const ActionsPage: React.FC = () => {
                   />
                 </IonItem>
               </>
+            )}
+
+            {/* Samsung App Control parameters */}
+            {(actionType === 'launch_app' || actionType === 'close_app' || actionType === 'switch_to_app') && (
+              <IonItem>
+                <IonLabel position="stacked">App Package Name *</IonLabel>
+                <IonInput
+                  value={appPackageName}
+                  onIonChange={e => setAppPackageName(e.detail.value!)}
+                  placeholder="com.android.chrome"
+                />
+              </IonItem>
             )}
 
             <IonButton expand="block" onClick={saveAction} style={{ marginTop: '20px' }}>
